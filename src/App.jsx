@@ -400,6 +400,26 @@ function FacultyDashboard({ user, firebaseMode, onLogout }) {
     setToast('Student roster exported as CSV.')
   }
 
+  function exportDepartmentCsv() {
+    const rows = [['department', 'students', 'average_attendance_percent', 'below_75_percent']]
+    const departments = [...new Set(students.map((student) => student.department))].sort()
+    for (const department of departments) {
+      const members = students.filter((student) => student.department === department)
+      const average = members.length
+        ? Math.round(members.reduce((sum, student) => sum + student.percentage, 0) / members.length)
+        : 0
+      rows.push([department, members.length, average, members.filter((student) => student.percentage < 75).length])
+    }
+    const contents = '\uFEFF' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([contents], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `department-attendance-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    setToast('Department report exported as CSV.')
+  }
+
   async function importStudentsCsv(event) {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -552,7 +572,7 @@ function FacultyDashboard({ user, firebaseMode, onLogout }) {
 
             <div className="grid gap-5 xl:grid-cols-[1.55fr_1fr]">
               <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/30 sm:p-6"><SectionHeading title="Weekly attendance trend" detail="Present or late as a share of the roster each day" action={<button type="button" onClick={() => changeTab('students')} className="hidden items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 sm:inline-flex">View analytics <ArrowRight size={14} /></button>} /><div className="mb-4 flex items-baseline gap-2"><span className="text-3xl font-semibold tracking-tight text-slate-900">{average}%</span><span className="text-xs font-medium text-emerald-700">overall average</span></div><WeeklyChart attendance={weeklyStats} /><div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4 text-[11px] text-slate-400"><span className="size-2 rounded-full bg-indigo-500" />Attendance records <span className="ml-auto">Updated automatically</span></div></article>
-              <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/30 sm:p-6"><SectionHeading title="Department average" detail="Attendance rate by department" /><DepartmentBreakdown students={students} /></article>
+              <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/30 sm:p-6"><SectionHeading title="Department average" detail="Attendance rate by department" action={<button type="button" onClick={exportDepartmentCsv} disabled={students.length === 0} className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40"><Download size={14} />Export CSV</button>} /><DepartmentBreakdown students={students} /></article>
             </div>
 
             <article className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/30"><div className="px-5 pt-5 sm:px-6"><SectionHeading title="Needs attention" detail="Students currently below 75% attendance" action={<button type="button" onClick={() => changeTab('reports')} className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800">See all <ArrowRight size={14} /></button>} /></div>{atRiskStudents.slice(0, 4).map((student) => <StudentRow key={student.id} student={student} compact />)}</article>
