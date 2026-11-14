@@ -105,7 +105,10 @@ function readStudentCsv(text) {
 
 function csvCell(value) {
   const text = String(value ?? '')
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+  // Spreadsheet apps evaluate cells beginning with formula characters. Keep
+  // roster exports as data even when a name, roll number, or department has one.
+  const safeText = /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text
+  return /[",\r\n]/.test(safeText) ? `"${safeText.replace(/"/g, '""')}"` : safeText
 }
 
 function attendanceStatus(percentage) {
