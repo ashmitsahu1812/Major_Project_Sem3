@@ -1,19 +1,21 @@
-FROM node:24-bookworm-slim
-
-RUN apt-get update && apt-get install -y --no-install-recommends openssl \
-    && rm -rf /var/lib/apt/lists/*
-
+FROM node:24-bookworm-slim AS build
 WORKDIR /app
-COPY client/package*.json ./client/
-COPY server/package*.json ./server/
-RUN cd client && npm ci
-RUN cd server && npm ci
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
 
-COPY client ./client
-COPY server ./server
-RUN cd client && npm run build
-RUN cd server && npx prisma generate
-
-ENV NODE_ENV=production PORT=5001 SERVE_CLIENT=true
-EXPOSE 5001
-CMD ["sh", "-c", "cd server && npx prisma db push && node src/index.js"]
+FROM node:24-bookworm-slim
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=4173
+ENV DATA_DIR=/app/data
+COPY --from=build --chown=node:node /app/package.json /app/package-lock.json ./
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/server ./server
+COPY --from=build --chown=node:node /app/public ./public
+RUN mkdir -p /app/data && chown -R node:node /app/data
+USER node
+EXPOSE 4173
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD node -e "fetch('http://127.0.0.1:4173/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+CMD ["npm", "start"]
